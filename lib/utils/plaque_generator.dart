@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdf/pdf.dart';
@@ -140,51 +141,63 @@ Future<img.Image> generateAnciennePlaqueBitmap(String immat) async {
 
 /// Génère un PDF en mémoire à partir d'un [plaqueBitmap] et retourne les bytes.
 Future<Uint8List> generatePdfFromBitmap(img.Image plaqueBitmap) async {
-  // Encode le bitmap en PNG pour l'intégrer dans le PDF
-  final pngBytes = Uint8List.fromList(img.encodePng(plaqueBitmap));
-  final pdfImage = pw.MemoryImage(pngBytes);
+  // Encode le bitmap en JPEG pour l'intégrer dans le PDF
+  final jpegBytes = Uint8List.fromList(img.encodeJpg(plaqueBitmap, quality: 95));
 
-  const pageWidth = 595.0;  // A4 en points
+  const pageWidth = 595.0; // A4 en points (portrait)
   const pageHeight = 842.0;
 
-  // Ratio d'échelle : on fait tenir la largeur de la plaque dans la hauteur A4
-  // (comme Android : scale = pageHeight / bitmap.width * 520/297)
-  final scale = pageHeight / plaqueBitmap.width * (520.0 / 297.0);
-  final scaledWidth = plaqueBitmap.width * scale;
-  final scaledHeight = plaqueBitmap.height * scale;
+  // Même calcul que l'Android original :
+  // scale = pageHeight / bitmap.width * 520/297
+  final double bmpW = plaqueBitmap.width.toDouble();
+  final double bmpH = plaqueBitmap.height.toDouble();
+  final double scale = pageHeight / bmpW * (520.0 / 297.0);
 
-  // Décalage vertical pour chaque moitié (comme Android : newWidth * 112/520)
-  final halfShift = scaledWidth * 112.0 / 520.0;
+  // Taille de la plaque après mise à l'échelle (avant rotation)
+  final double scaledW = bmpW * scale; // correspond à la "largeur" une fois pivotée → hauteur sur la page
 
-  // Centrage sur la page
-  final dx = (pageWidth - scaledWidth) / 2;
-  final dy = (pageHeight - scaledHeight) / 2;
+  // Décalage pour chaque moitié (comme Android : newWidth * 112/520)
+  final double halfShift = scaledW * 112.0 / 520.0;
 
   final pdf = pw.Document();
+  final pdfDoc = pdf.document;
+
+  // Crée l'image PDF une seule fois
+  final pdfImage = PdfImage.jpeg(pdfDoc, image: jpegBytes);
 
   for (final isTop in [true, false]) {
-    pdf.addPage(
-      pw.Page(
-        pageFormat: const PdfPageFormat(pageWidth, pageHeight),
-        build: (context) {
-          return pw.Transform(
-            transform: Matrix4.identity()
-              // 1. Mise à l'échelle
-              ..scaleByDouble(scale, scale, 1.0, 1.0)
-              // 2. Centrage
-              ..translateByDouble(dx / scale, dy / scale, 0.0, 1.0)
-              // 3. Décalage haut/bas
-              ..translateByDouble(0.0, (isTop ? halfShift : -halfShift) / scale, 0.0, 1.0),
-            child: pw.Transform.rotate(
-              angle: 3.14159265 / 2, // 90°
-              alignment: pw.Alignment.center,
-              child: pw.Image(pdfImage),
-            ),
-          );
-        },
-      ),
+    final page = PdfPage(pdfDoc, pageFormat: const PdfPageFormat(pageWidth, pageHeight));
+    final g = page.getGraphics();
+
+    // Le package `pdf` utilise un repère Y inversé (origine en bas à gauche).
+    // On reproduit les 4 transformations Android :
+    //   1. Rotation 90° autour du centre de la page
+    //   2. Mise à l'échelle
+    //   3. Centrage
+    //   4. Décalage haut/bas selon la moitié
+
+    g.saveContext();
+
+    // Origine au centre de la page
+    g.setTransform(
+      Matrix4.identity()
+        // Déplace l'origine au centre de la page (repère PDF bas-gauche)
+        ..translateByDouble(pageWidth / 2, pageHeight / 2, 0.0, 1.0)
+        // Rotation -90° (sens trigo → sens horaire en PDF)
+        ..rotateZ(-math.pi / 2)
+        // Décalage haut/bas pour la moitié concernée (axe Y post-rotation)
+        ..translateByDouble(0.0, isTop ? halfShift : -halfShift, 0.0, 1.0)
+        // Mise à l'échelle
+        ..scaleByDouble(scale, scale, 1.0, 1.0)
+        // Ramène le coin haut-gauche du bitmap à l'origine locale
+        ..translateByDouble(-bmpW / 2, -bmpH / 2, 0.0, 1.0),
     );
+
+    // Dessine le bitmap à (0,0) dans le repère local
+    g.drawImage(pdfImage, 0, 0, bmpW * scale, bmpH * scale);
+
+    g.restoreContext();
   }
 
-  return pdf.save();
+  return pdfDoc.save();
 }

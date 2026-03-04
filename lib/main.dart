@@ -57,31 +57,11 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo / icône plaque
-            Container(
+            // Vrai logo de l'application
+            Image.asset(
+              'assets/logo_app.png',
               width: 120,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'AB·123·CD',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1a1a2e),
-                  letterSpacing: 2,
-                ),
-              ),
+              height: 120,
             ),
             const SizedBox(height: 32),
             const Text(
