@@ -52,33 +52,12 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF6F90D6),
+      backgroundColor: Colors.white,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Vrai logo de l'application
-            Image.asset(
-              'assets/logo_app.png',
-              width: 120,
-              height: 120,
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'PLAcreator',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 3,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Générateur de plaques d\'immatriculation',
-              style: TextStyle(fontSize: 13, color: Colors.white70),
-            ),
-          ],
+        child: Image.asset(
+          'assets/logo_app.png',
+          width: 160,
+          height: 160,
         ),
       ),
     );

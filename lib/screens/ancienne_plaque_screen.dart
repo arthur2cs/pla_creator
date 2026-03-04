@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import '../utils/plaque_generator.dart';
+import '../utils/plaque_input_formatters.dart';
 
 class AnciennePlaqueScreen extends StatefulWidget {
   const AnciennePlaqueScreen({super.key});
@@ -26,12 +27,9 @@ class _AnciennePlaqueScreenState extends State<AnciennePlaqueScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final immatFormate = formatAncienneImmatriculation(_immatController.text);
-
-      if (immatFormate.isEmpty) {
-        _showError('Le numéro doit contenir 8 ou 9 caractères alphanumériques.');
-        return;
-      }
+      // Le formatter a déjà inséré les espaces, on les remplace par '_'
+      // pour correspondre au nom de fichier '_.jpg' dans les assets
+      final immatFormate = _immatController.text.toLowerCase().replaceAll(' ', '_');
 
       final bitmap = await generateAnciennePlaqueBitmap(immatFormate);
       final pdfBytes = await generatePdfFromBitmap(bitmap);
@@ -107,16 +105,17 @@ class _AnciennePlaqueScreenState extends State<AnciennePlaqueScreen> {
                 TextFormField(
                   controller: _immatController,
                   textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [AncienneImmatFormatter()],
                   decoration: _inputDecoration(
                     'Numéro de plaque',
-                    'Ex : ABC123AB',
+                    'Ex : ABC 123 AB',
                     accentColor,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Champ obligatoire';
+                    if (v == null || v.isEmpty) return 'Champ obligatoire';
                     final cleaned = v.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
                     if (cleaned.length != 8 && cleaned.length != 9) {
-                      return '8 ou 9 caractères alphanumériques requis';
+                      return 'Format incomplet (ex : ABC 123 AB ou ABCD 123 AB)';
                     }
                     return null;
                   },

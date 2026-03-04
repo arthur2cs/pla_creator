@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import '../utils/plaque_generator.dart';
 import '../utils/constantes.dart';
+import '../utils/plaque_input_formatters.dart';
 
 class NouvellePlaqueScreen extends StatefulWidget {
   const NouvellePlaqueScreen({super.key});
@@ -29,13 +30,10 @@ class _NouvellePlaqueScreenState extends State<NouvellePlaqueScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final immatFormate = formatNouvelleImmatriculation(_immatController.text);
+      // Le formatter garantit déjà le format AA-123-BB, on passe en minuscules
+      // pour correspondre aux noms de fichiers assets (a.jpg, b.jpg…)
+      final immatFormate = _immatController.text.toLowerCase();
       final dept = _deptController.text.trim().toUpperCase();
-
-      if (immatFormate.isEmpty) {
-        _showError('Le numéro de plaque doit contenir exactement 7 caractères alphanumériques (ex: AB123CD).');
-        return;
-      }
 
       final bitmap = await generateNovellePlaqueBitmap(immatFormate, dept);
       final pdfBytes = await generatePdfFromBitmap(bitmap);
@@ -94,15 +92,17 @@ class _NouvellePlaqueScreenState extends State<NouvellePlaqueScreen> {
                 TextFormField(
                   controller: _immatController,
                   textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [NouvelleImmatFormatter()],
                   decoration: _inputDecoration(
                     'Numéro de plaque',
-                    'Ex : AB123CD',
+                    'Ex : AB-123-CD',
                     accentColor,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Champ obligatoire';
+                    if (v == null || v.isEmpty) return 'Champ obligatoire';
+                    // Format attendu après formatter : AA-123-BB = 9 chars
                     final cleaned = v.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-                    if (cleaned.length != 7) return '7 caractères alphanumériques requis';
+                    if (cleaned.length != 7) return 'Format incomplet (ex : AB-123-CD)';
                     return null;
                   },
                 ),
