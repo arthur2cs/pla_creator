@@ -32,6 +32,16 @@ class _NouvellePlaqueScreenState extends State<NouvellePlaqueScreen> {
     super.dispose();
   }
 
+  bool get _saisieValide {
+    final immatOk = _immatController.text
+            .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+            .length ==
+        7;
+    final deptOk = departementRegion
+        .containsKey(_deptController.text.trim().toUpperCase());
+    return immatOk && deptOk;
+  }
+
   Future<void> _genererPdf() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -141,7 +151,7 @@ class _NouvellePlaqueScreenState extends State<NouvellePlaqueScreen> {
                 SizedBox(
                   height: 52,
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _genererPdf,
+                    onPressed: _isLoading || !_saisieValide ? null : _genererPdf,
                     icon: _isLoading
                         ? const SizedBox(
                             width: 20,
