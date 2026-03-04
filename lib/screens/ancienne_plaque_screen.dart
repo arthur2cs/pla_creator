@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import '../utils/plaque_generator.dart';
 import '../utils/plaque_input_formatters.dart';
+import '../widgets/plaque_preview.dart';
 
 class AnciennePlaqueScreen extends StatefulWidget {
   const AnciennePlaqueScreen({super.key});
@@ -14,6 +15,12 @@ class _AnciennePlaqueScreenState extends State<AnciennePlaqueScreen> {
   final _immatController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _immatController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -73,13 +80,11 @@ class _AnciennePlaqueScreenState extends State<AnciennePlaqueScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Aperçu plaque vierge
+                // Aperçu dynamique de la plaque
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    'assets/plaque_ancien_vierge.jpg',
-                    height: 80,
-                    fit: BoxFit.contain,
+                  child: AnciennePlaquePreview(
+                    immat: _immatController.text,
                   ),
                 ),
                 const SizedBox(height: 16),

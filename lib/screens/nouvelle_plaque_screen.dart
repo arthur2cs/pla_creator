@@ -3,6 +3,7 @@ import 'package:printing/printing.dart';
 import '../utils/plaque_generator.dart';
 import '../utils/constantes.dart';
 import '../utils/plaque_input_formatters.dart';
+import '../widgets/plaque_preview.dart';
 
 class NouvellePlaqueScreen extends StatefulWidget {
   const NouvellePlaqueScreen({super.key});
@@ -16,6 +17,13 @@ class _NouvellePlaqueScreenState extends State<NouvellePlaqueScreen> {
   final _deptController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _immatController.addListener(() => setState(() {}));
+    _deptController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -77,13 +85,12 @@ class _NouvellePlaqueScreenState extends State<NouvellePlaqueScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Aperçu plaque vierge
+                // Aperçu dynamique de la plaque
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    'assets/plaque_vierge.jpg',
-                    height: 80,
-                    fit: BoxFit.contain,
+                  child: NouvellePlaquePreview(
+                    immat: _immatController.text,
+                    dept: _deptController.text,
                   ),
                 ),
                 const SizedBox(height: 32),
