@@ -140,62 +140,76 @@ Future<img.Image> generateAnciennePlaqueBitmap(String immat) async {
 // Cela correspond exactement au comportement de l'appli Android originale.
 
 /// Génère un PDF en mémoire à partir d'un [plaqueBitmap] et retourne les bytes.
+///
+/// Chaque demi-plaque (260 × 110 mm) est imprimée **verticalement** sur une
+/// page A4 portrait (210 × 297 mm) :
+///   - la longueur de 260 mm est orientée dans le sens de la hauteur (297 mm)
+///   - la hauteur de 110 mm est centrée dans la largeur (210 mm)
+/// En imprimant les deux feuilles et en les collant, on obtient la plaque
+/// complète au format réel 520 × 110 mm.
 Future<Uint8List> generatePdfFromBitmap(img.Image plaqueBitmap) async {
-  // Encode le bitmap en JPEG pour l'intégrer dans le PDF
   final jpegBytes = Uint8List.fromList(img.encodeJpg(plaqueBitmap, quality: 95));
 
-  const pageWidth = 595.0; // A4 en points (portrait)
-  const pageHeight = 842.0;
+  // 1 mm = 2.8346 points PDF
+  const mm = 2.8346;
 
-  // Même calcul que l'Android original :
-  // scale = pageHeight / bitmap.width * 520/297
+  // Page A4 portrait
+  const pageW = 210.0 * mm; // ≈ 595.3 pts
+  const pageH = 297.0 * mm; // ≈ 841.9 pts
+
+  // Plaque réelle : 520 mm de long → scale basé sur la largeur du bitmap
+  const plaqueW = 520.0 * mm; // ≈ 1474.0 pts (longueur totale)
+
   final double bmpW = plaqueBitmap.width.toDouble();
   final double bmpH = plaqueBitmap.height.toDouble();
-  final double scale = pageHeight / bmpW * (520.0 / 297.0);
 
-  // Taille de la plaque après mise à l'échelle (avant rotation)
-  final double scaledW = bmpW * scale; // correspond à la "largeur" une fois pivotée → hauteur sur la page
+  // Scale : bmpW pixels → 520 mm
+  final double scale = plaqueW / bmpW;
 
-  // Décalage pour chaque moitié (comme Android : newWidth * 112/520)
-  final double halfShift = scaledW * 112.0 / 520.0;
+  // Après scale :
+  //   longueur totale  = plaqueW      (≈ 1474 pts)
+  //   demi-longueur    = plaqueW / 2  (≈  737 pts = 260 mm)
+  //   hauteur de plaque = bmpH * scale (≈  299 pts ≈ 105 mm)
+  final double halfW   = plaqueW / 2;
+  final double rendH   = bmpH * scale;
+
+  // Rotation +90° (CCW) : le bitmap couché passe en portrait sur la page.
+  // Transformation appliquée : translate(cx, cy) → rotateZ(+π/2) → scale(s,s)
+  // Un point (x, y) du bitmap arrive en page à :
+  //   page_x = cx - y * scale
+  //   page_y = cy + x * scale
+  //
+  // On veut :
+  //   - la hauteur de la plaque (axe Y bitmap, 0..bmpH) centrée en X page
+  //     => cx = (pageW + rendH) / 2
+  //   - la demi-longueur (axe X bitmap) centrée en Y page
+  //     => cy = (pageH - halfW) / 2
+  //   - Page 1 : affiche x = 0..bmpW/2  → cy = margin_y
+  //   - Page 2 : affiche x = bmpW/2..bmpW → cy = margin_y - halfW
+  final double cx       = (pageW + rendH) / 2;
+  final double marginY  = (pageH - halfW) / 2;
+  final cys = [marginY, marginY - halfW];
 
   final pdf = pw.Document();
   final pdfDoc = pdf.document;
-
-  // Crée l'image PDF une seule fois
   final pdfImage = PdfImage.jpeg(pdfDoc, image: jpegBytes);
 
-  for (final isTop in [true, false]) {
-    final page = PdfPage(pdfDoc, pageFormat: const PdfPageFormat(pageWidth, pageHeight));
+  for (final cy in cys) {
+    final page = PdfPage(
+      pdfDoc,
+      pageFormat: const PdfPageFormat(pageW, pageH),
+    );
     final g = page.getGraphics();
 
-    // Le package `pdf` utilise un repère Y inversé (origine en bas à gauche).
-    // On reproduit les 4 transformations Android :
-    //   1. Rotation 90° autour du centre de la page
-    //   2. Mise à l'échelle
-    //   3. Centrage
-    //   4. Décalage haut/bas selon la moitié
-
     g.saveContext();
-
-    // Origine au centre de la page
     g.setTransform(
       Matrix4.identity()
-        // Déplace l'origine au centre de la page (repère PDF bas-gauche)
-        ..translateByDouble(pageWidth / 2, pageHeight / 2, 0.0, 1.0)
-        // Rotation -90° (sens trigo → sens horaire en PDF)
-        ..rotateZ(-math.pi / 2)
-        // Décalage haut/bas pour la moitié concernée (axe Y post-rotation)
-        ..translateByDouble(0.0, isTop ? halfShift : -halfShift, 0.0, 1.0)
-        // Mise à l'échelle
-        ..scaleByDouble(scale, scale, 1.0, 1.0)
-        // Ramène le coin haut-gauche du bitmap à l'origine locale
-        ..translateByDouble(-bmpW / 2, -bmpH / 2, 0.0, 1.0),
+        ..translateByDouble(cx, cy, 0.0, 1.0)
+        ..rotateZ(math.pi / 2)   // +90° CCW
+        ..scaleByDouble(scale, scale, 1.0, 1.0),
     );
-
-    // Dessine le bitmap à (0,0) dans le repère local
-    g.drawImage(pdfImage, 0, 0, bmpW * scale, bmpH * scale);
-
+    // drawImage en coordonnées locales (bitmap entier, le clip est géré par la page)
+    g.drawImage(pdfImage, 0, 0, bmpW, bmpH);
     g.restoreContext();
   }
 
